@@ -1,0 +1,15 @@
+{
+    "name": "nordsoftware/yii-paytrail",
+    "description": "Paytrail implementation for yii-paymentmanager.",
+    "type": "library",
+    "license": "BSD-3-Clause",
+    "authors": [
+        {
+            "name": "Christoffer Niska",
+            "email": "christoffer.niska@nordsoftware.com"
+        }
+    ],
+    "require": {
+        "nordsoftware/yii-paymentmanager": "0.1.*"
+    }
+}
