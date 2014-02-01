@@ -10,11 +10,6 @@
 use NordSoftware\Paytrail\Object\Payment;
 use NordSoftware\Paytrail\Object\Product;
 
-Yii::setPathOfAlias(
-    'NordSoftware',
-    Yii::getPathOfAlias('common.extensions.yii-paytrail.lib.paytrail-php.src.NordSoftware')
-);
-
 class PaytrailGateway extends PaymentGateway
 {
     /**
@@ -75,6 +70,7 @@ class PaytrailGateway extends PaymentGateway
     {
         parent::init();
         $this->createPathAlias('paytrail', dirname(__DIR__));
+        $this->import('components.*');
         $this->import('models.*');
         $this->_client = $this->createClient();
     }
