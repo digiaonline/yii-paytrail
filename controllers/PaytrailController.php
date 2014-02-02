@@ -9,7 +9,30 @@
 
 class PaytrailController extends CController
 {
+    /**
+     * @var mixed
+     */
+    public $successRoute;
+
+    /**
+     * @var mixed
+     */
+    public $failureRoute;
+
+    /**
+     * @var string
+     */
     public $managerId = 'payment';
+
+    public function init()
+    {
+        if (!isset($this->successRoute)) {
+            throw new CException('PaytrailController.successRoute must be set.');
+        }
+        if (!isset($this->failureRoute)) {
+            throw new CException('PaytrailController.failureRoute must be set.');
+        }
+    }
 
     public function actionTest()
     {
@@ -54,33 +77,43 @@ class PaytrailController extends CController
         Yii::app()->payment->pay(1, $transaction);
     }
 
-    public function actionFailure($transactionId)
-    {
-        $manager = $this->getPaymentManager();
-        $transaction = $manager->loadTransaction($transactionId);
-        $manager->changeTransactionStatus(PaymentTransaction::STATUS_FAILED, $transaction);
-        die('failure');
-    }
-
-    public function actionNotify($transactionId)
-    {
-        //$transaction = $this->loadTransaction($transactionId);
-    }
-
-    public function actionPending($transactionId)
-    {
-        $manager = $this->getPaymentManager();
-        $transaction = $manager->loadTransaction($transactionId);
-        $manager->changeTransactionStatus(PaymentTransaction::STATUS_PENDING, $transaction);
-        die('pending');
-    }
-
+    /**
+     * @param int $transactionId
+     */
     public function actionSuccess($transactionId)
     {
         $manager = $this->getPaymentManager();
         $transaction = $manager->loadTransaction($transactionId);
         $manager->changeTransactionStatus(PaymentTransaction::STATUS_COMPLETED, $transaction);
-        die('success');
+        $this->redirect($this->successRoute);
+    }
+
+    /**
+     * @param int $transactionId
+     */
+    public function actionFailure($transactionId)
+    {
+        $manager = $this->getPaymentManager();
+        $transaction = $manager->loadTransaction($transactionId);
+        $manager->changeTransactionStatus(PaymentTransaction::STATUS_FAILED, $transaction);
+        $this->redirect($this->failureRoute);
+    }
+
+    /**
+     * @param $transactionId
+     */
+    public function actionNotify($transactionId)
+    {
+    }
+
+    /**
+     * @param int $transactionId
+     */
+    public function actionPending($transactionId)
+    {
+        $manager = $this->getPaymentManager();
+        $transaction = $manager->loadTransaction($transactionId);
+        $manager->changeTransactionStatus(PaymentTransaction::STATUS_PENDING, $transaction);
     }
 
     /**
