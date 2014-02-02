@@ -76,24 +76,19 @@ class PaytrailGateway extends PaymentGateway
     }
 
     /**
-     * @param int $orderId
      * @param PaymentTransaction $transaction
      * @throws Exception
      */
-    public function handleTransaction($orderId, $transaction)
+    public function handleTransaction($transaction)
     {
         $params = array('transactionId' => $transaction->id);
-        $urlset = PaytrailUrlset::create(
-            array(
-                'successUrl' => Yii::app()->createAbsoluteUrl($this->successRoute, $params),
-                'failureUrl' => Yii::app()->createAbsoluteUrl($this->failureRoute, $params),
-                'notificationUrl' => Yii::app()->createAbsoluteUrl($this->notificationRoute, $params),
-                'pendingUrl' => isset($this->pendingRoute) ? Yii::app()->createAbsoluteUrl(
-                        $this->pendingRoute,
-                        $params
-                    ) : '',
-            )
-        );
+        $attributes = array();
+        foreach (array('successUrl', 'failureUrl', 'notificationUrl', 'pendingUrl') as $attribute) {
+            if (isset($this->$attributes)) {
+                $attributes[$attribute] = Yii::app()->createAbsoluteUrl($this->$attribute, $params);
+            }
+        }
+        $urlset = PaytrailUrlset::create($attributes);
 
         $address = PaytrailAddress::create(
             array(
@@ -118,7 +113,7 @@ class PaytrailGateway extends PaymentGateway
 
         $payment = PaytrailPayment::create(
             array(
-                'orderNumber' => $orderId,
+                'orderNumber' => $transaction->orderIdentifier,
                 'referenceNumber' => $transaction->referenceNumber,
                 'description' => $transaction->description,
                 'contactId' => $contact->id,
@@ -142,8 +137,6 @@ class PaytrailGateway extends PaymentGateway
             $payment->addProduct($product);
         }
 
-        //var_dump($payment->toObject()->toArray());die;
-
         try {
             $response = $this->_client->processPayment($payment->toObject());
             $result = PaytrailResult::create(
@@ -155,11 +148,12 @@ class PaytrailGateway extends PaymentGateway
                 )
             );
 
-            $this->raiseEvent('onPaymentSuccess', $this->createEvent($transaction));
+            $this->onPaymentSuccess($this->createEvent($transaction));
 
             Yii::app()->controller->redirect($result->url);
         } catch (Exception $e) {
-            $this->raiseEvent('onPaymentFailed', $this->createEvent($transaction));
+            $this->onPaymentFailed($this->createEvent($transaction));
+
             throw $e;
         }
     }
