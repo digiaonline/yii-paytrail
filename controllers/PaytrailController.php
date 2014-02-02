@@ -76,7 +76,7 @@ class PaytrailController extends PaymentController
     {
         $manager = $this->getPaymentManager();
         $transaction = $manager->loadTransaction($transactionId);
-        $manager->changeTransactionStatus(PaymentTransaction::STATUS_COMPLETED, $transaction);
+        $manager->changeTransactionStatus(PaymentTransaction::STATUS_SUCCESSFUL, $transaction);
         $this->redirect($manager->successUrl);
     }
 
@@ -92,10 +92,14 @@ class PaytrailController extends PaymentController
     }
 
     /**
-     * @param $transactionId
+     * @param int $transactionId
      */
     public function actionNotify($transactionId)
     {
+        $manager = $this->getPaymentManager();
+        $transaction = $manager->loadTransaction($transactionId);
+        $manager->changeTransactionStatus(PaymentTransaction::STATUS_COMPLETED, $transaction);
+        Yii::app()->end();
     }
 
     /**
@@ -106,5 +110,6 @@ class PaytrailController extends PaymentController
         $manager = $this->getPaymentManager();
         $transaction = $manager->loadTransaction($transactionId);
         $manager->changeTransactionStatus(PaymentTransaction::STATUS_PENDING, $transaction);
+        Yii::app()->end();
     }
 }
