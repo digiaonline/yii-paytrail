@@ -18,7 +18,7 @@ class PaytrailController extends PaymentController
     {
         $transaction = PaymentTransaction::create(
             array(
-                'methodId' => 1,
+                'gateway' => 'paytrail',
                 'orderIdentifier' => 1,
                 'description' => 'Test payment',
                 'price' => 100.00,
