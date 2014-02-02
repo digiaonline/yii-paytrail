@@ -84,7 +84,7 @@ class PaytrailGateway extends PaymentGateway
         $params = array('transactionId' => $transaction->id);
         $attributes = array();
         foreach (array('successUrl', 'failureUrl', 'notificationUrl', 'pendingUrl') as $attribute) {
-            if (isset($this->$attributes)) {
+            if (isset($this->$attribute)) {
                 $attributes[$attribute] = Yii::app()->createAbsoluteUrl($this->$attribute, $params);
             }
         }
