@@ -30,17 +30,17 @@ class PaytrailGateway extends PaymentGateway
     /**
      * @var string
      */
-    public $successRoute = '/paytrail/success';
+    public $successRoute = 'paytrail/success';
 
     /**
      * @var string
      */
-    public $failureRoute = '/paytrail/failure';
+    public $failureRoute = 'paytrail/failure';
 
     /**
      * @var string
      */
-    public $notificationRoute = '/paytrail/notify';
+    public $notificationRoute = 'paytrail/notify';
 
     /**
      * @var string
@@ -66,6 +66,9 @@ class PaytrailGateway extends PaymentGateway
      */
     protected $_client;
 
+    /**
+     * Initializes this gateway.
+     */
     public function init()
     {
         parent::init();
@@ -148,12 +151,10 @@ class PaytrailGateway extends PaymentGateway
                 )
             );
 
-            $this->onPaymentSuccess($this->createEvent($transaction));
-
+            $this->onTransactionProcessed($this->createEvent($transaction));
             Yii::app()->controller->redirect($result->url);
         } catch (Exception $e) {
-            $this->onPaymentFailed($this->createEvent($transaction));
-
+            $this->onTransactionFailed($this->createEvent($transaction));
             throw $e;
         }
     }
