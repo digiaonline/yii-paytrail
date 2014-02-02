@@ -7,6 +7,6 @@
  * @package nordsoftware.yii-paytrail.components
  */
 
-class PaytrailActiveRecord extends CActiveRecord
+abstract class PaytrailActiveRecord extends CActiveRecord
 {
 }

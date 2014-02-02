@@ -7,36 +7,27 @@
  * @package nordsoftware.yii-paytrail.controllers
  */
 
-class PaytrailController extends CController
+class PaytrailController extends PaymentController
 {
-    /**
-     * @var mixed
-     */
-    public $successRoute;
-
-    /**
-     * @var mixed
-     */
-    public $failureRoute;
-
     /**
      * @var string
      */
     public $managerId = 'payment';
 
-    public function init()
-    {
-        if (!isset($this->successRoute)) {
-            throw new CException('PaytrailController.successRoute must be set.');
-        }
-        if (!isset($this->failureRoute)) {
-            throw new CException('PaytrailController.failureRoute must be set.');
-        }
-    }
-
     public function actionTest()
     {
-        $contact = PaymentContact::create(
+        $transaction = PaymentTransaction::create(
+            array(
+                'methodId' => 1,
+                'orderIdentifier' => 1,
+                'description' => 'Test payment',
+                'price' => 100.00,
+                'currency' => 'EUR',
+                'vat' => 28.00,
+            )
+        );
+
+        $transaction->addShippingContact(
             array(
                 'firstName' => 'Foo',
                 'lastName' => 'Bar',
@@ -51,30 +42,31 @@ class PaytrailController extends CController
             )
         );
 
-        $transaction = PaymentTransaction::create(
+        $transaction->addItem(
             array(
-                'methodId' => 1,
-                'shippingContactId' => $contact->id,
-                'description' => 'Test payment',
-                'price' => 100.00,
-                'currency' => 'EUR',
-                'vat' => 28.00,
+                'description' => 'Test product',
+                'code' => '01234',
+                'quantity' => 5,
+                'price' => 19.90,
+                'vat' => 23.00,
+                'discount' => 10.00,
+                'type' => 1,
             )
         );
 
         $transaction->addItem(
             array(
-                'description' => 'Test product',
-                'code' => '01234',
+                'description' => 'Another test product',
+                'code' => '43210',
                 'quantity' => 1,
-                'price' => 19.90,
+                'price' => 49.90,
                 'vat' => 23.00,
-                'discount' => 5.00,
+                'discount' => 50.00,
                 'type' => 1,
             )
         );
 
-        Yii::app()->payment->pay(1, $transaction);
+        Yii::app()->payment->startTransaction($transaction);
     }
 
     /**
@@ -85,7 +77,7 @@ class PaytrailController extends CController
         $manager = $this->getPaymentManager();
         $transaction = $manager->loadTransaction($transactionId);
         $manager->changeTransactionStatus(PaymentTransaction::STATUS_COMPLETED, $transaction);
-        $this->redirect($this->successRoute);
+        $this->redirect($manager->successUrl);
     }
 
     /**
@@ -96,7 +88,7 @@ class PaytrailController extends CController
         $manager = $this->getPaymentManager();
         $transaction = $manager->loadTransaction($transactionId);
         $manager->changeTransactionStatus(PaymentTransaction::STATUS_FAILED, $transaction);
-        $this->redirect($this->failureRoute);
+        $this->redirect($manager->failureUrl);
     }
 
     /**
@@ -114,17 +106,5 @@ class PaytrailController extends CController
         $manager = $this->getPaymentManager();
         $transaction = $manager->loadTransaction($transactionId);
         $manager->changeTransactionStatus(PaymentTransaction::STATUS_PENDING, $transaction);
-    }
-
-    /**
-     * @return PaymentManager
-     * @throws CException
-     */
-    protected function getPaymentManager()
-    {
-        if (!Yii::app()->hasComponent($this->managerId)) {
-            throw new CException(sprintf('PaytrailController.managerId is invalid.'));
-        }
-        return Yii::app()->getComponent($this->managerId);
     }
 }
