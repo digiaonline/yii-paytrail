@@ -14,6 +14,65 @@ class PaytrailController extends PaymentController
      */
     public $managerId = 'payment';
 
+    /**
+     * @return array
+     */
+    public function filters()
+    {
+        return array(
+            'accessControl',
+            'validateRequest + success, failure, notify, pending',
+        );
+    }
+
+    /**
+     * @param CFilterChain $filterChain
+     * @throws CHttpException
+     * @throws CException
+     */
+    public function filterValidateRequest(CFilterChain $filterChain)
+    {
+        if (!isset($_GET['ORDER_NUMBER']) || !isset($_GET['TIMESTAMP']) || !isset($_GET['PAID']) || !isset($_GET['METHOD'])) {
+            throw new CHttpException(400, 'Invalid request.');
+        }
+        if (!$this->validateAuthCode()) {
+            throw new CException('Invalid authentication code.');
+        }
+        $filterChain->run();
+    }
+
+    /**
+     * @return bool
+     */
+    protected function validateAuthCode()
+    {
+        $manager = $this->getPaymentManager();
+        /** @var PaytrailGateway $gateway */
+        $gateway = $manager->createGateway('paytrail');
+        $data = implode(
+            '|',
+            array(
+                $_GET['ORDER_NUMBER'],
+                $_GET['TIMESTAMP'],
+                $_GET['PAID'],
+                $_GET['METHOD'],
+                $gateway->apiSecret,
+            )
+        );
+        return $_GET['RETURN_AUTHCODE'] === strtoupper(md5($data));
+    }
+
+    /**
+     * @return array access control rules.
+     */
+    public function accessRules()
+    {
+        return array(
+            array('allow', 'users' => array('@')),
+            array('deny'),
+        );
+    }
+
     public function actionTest()
     {
         $transaction = PaymentTransaction::create(
