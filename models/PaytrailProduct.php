@@ -13,14 +13,15 @@ use NordSoftware\Paytrail\Object\Product;
  * This is the model class for table "paytrail_product".
  *
  * The followings are the available columns in table 'paytrail_product':
- * @property string $id
+ * @property integer $id
+ * @property integer $paymentId
  * @property string $title
  * @property string $code
  * @property string $quantity
- * @property string $price
- * @property string $vat
- * @property string $discount
- * @property string $type
+ * @property float $price
+ * @property float $vat
+ * @property float $discount
+ * @property int $type
  * @property integer $status
  *
  * The followings are the available model relations:
@@ -40,15 +41,30 @@ class PaytrailProduct extends PaytrailActiveRecord
     }
 
     /**
+     * @return array attached behaviors.
+     */
+    public function behaviors()
+    {
+        return array_merge(
+            parent::behaviors(),
+            array(
+                'audit' => array(
+                    'class' => 'AuditBehavior',
+                ),
+            )
+        );
+    }
+
+    /**
      * @return array validation rules for model attributes.
      */
     public function rules()
     {
         return array(
-            array('title, quantity, price, vat, discount, type', 'required'),
-            array('quantity, status', 'numerical', 'integerOnly' => true),
+            array('paymentId, title, quantity, price, vat, discount, type', 'required'),
+            array('paymentId, quantity, status', 'numerical', 'integerOnly' => true),
             array('vat, discount', 'length', 'max' => 5),
-            array('quantity, type', 'length', 'max' => 10),
+            array('paymentId, quantity, type', 'length', 'max' => 10),
             array('price', 'length', 'max' => 15),
             array('code', 'length', 'max' => 16),
             array('title, code', 'length', 'max' => 255),
@@ -70,6 +86,7 @@ class PaytrailProduct extends PaytrailActiveRecord
     {
         return array(
             'id' => Yii::t('paytrail', 'ID'),
+            'paymentId, ' => Yii::t('paytrail', 'Payment'),
             'title' => Yii::t('paytrail', 'Title'),
             'code' => Yii::t('paytrail', 'Code'),
             'quantity' => Yii::t('paytrail', 'Quantity'),

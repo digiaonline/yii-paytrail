@@ -7,6 +7,7 @@ class m131125_143421_create_paytrail_product_table extends CDbMigration
         $this->execute(
             "CREATE TABLE `paytrail_product` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `paymentId` INT UNSIGNED NOT NULL,
                 `title` VARCHAR(255) NOT NULL,
                 `code` VARCHAR(16) NULL DEFAULT NULL,
                 `quantity` INT UNSIGNED NOT NULL,
