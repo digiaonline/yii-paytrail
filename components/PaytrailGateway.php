@@ -72,9 +72,6 @@ class PaytrailGateway extends PaymentGateway
     public function init()
     {
         parent::init();
-        $this->createPathAlias('paytrail', dirname(__DIR__));
-        $this->import('components.*');
-        $this->import('models.*');
         $this->_client = $this->createClient();
     }
 
@@ -84,11 +81,10 @@ class PaytrailGateway extends PaymentGateway
      */
     public function handleTransaction($transaction)
     {
-        $params = array('transactionId' => $transaction->id);
         $attributes = array();
         foreach (array('success', 'failure', 'notification', 'pending') as $attribute) {
             if (isset($this->{$attribute . 'Route'})) {
-                $attributes[$attribute . 'Url'] = Yii::app()->createAbsoluteUrl($this->{$attribute . 'Route'}, $params);
+                $attributes[$attribute . 'Url'] = Yii::app()->createAbsoluteUrl($this->{$attribute . 'Route'});
             }
         }
         $urlset = PaytrailUrlset::create($attributes);
@@ -126,8 +122,9 @@ class PaytrailGateway extends PaymentGateway
         );
 
         foreach ($transaction->items as $item) {
-            $product = PaytrailProduct::create(
+            PaytrailProduct::create(
                 array(
+                    'paymentId' => $payment->id,
                     'title' => $item->description,
                     'code' => $item->code,
                     'quantity' => (float)$item->quantity,
@@ -137,10 +134,10 @@ class PaytrailGateway extends PaymentGateway
                     'type' => Product::TYPE_NORMAL,
                 )
             );
-            $payment->addProduct($product);
         }
 
         try {
+            $this->onBeforeProcessTransaction($this->createEvent($transaction));
             $response = $this->_client->processPayment($payment->toObject());
             $result = PaytrailResult::create(
                 array(
@@ -150,8 +147,7 @@ class PaytrailGateway extends PaymentGateway
                     'url' => $response->getUrl(),
                 )
             );
-
-            $this->onTransactionProcessed($this->createEvent($transaction));
+            $this->onAfterProcessTransaction($this->createEvent($transaction));
             Yii::app()->controller->redirect($result->url);
         } catch (Exception $e) {
             $this->onTransactionFailed($this->createEvent($transaction));

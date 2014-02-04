@@ -40,6 +40,21 @@ class PaytrailPayment extends PaytrailActiveRecord
     }
 
     /**
+     * @return array attached behaviors.
+     */
+    public function behaviors()
+    {
+        return array_merge(
+            parent::behaviors(),
+            array(
+                'audit' => array(
+                    'class' => 'AuditBehavior',
+                ),
+            )
+        );
+    }
+
+    /**
      * @return array validation rules for model attributes.
      */
     public function rules()
@@ -64,11 +79,7 @@ class PaytrailPayment extends PaytrailActiveRecord
         return array(
             'contact' => array(self::BELONGS_TO, 'PaytrailContact', 'contactId'),
             'urlset' => array(self::BELONGS_TO, 'PaytrailUrlset', 'urlsetId'),
-            'products' => array(
-                self::MANY_MANY,
-                'PaytrailProduct',
-                'paytrail_payment_product(paymentId, productId)'
-            ),
+            'products' => array(self::HAS_MANY, 'PaytrailProduct', 'paymentId'),
         );
     }
 
@@ -91,23 +102,8 @@ class PaytrailPayment extends PaytrailActiveRecord
     }
 
     /**
-     * @param PaytrailProduct $product
+     * @return Payment
      */
-    public function addProduct($product)
-    {
-        $model = new PaytrailPaymentProduct;
-        $model->paymentId = $this->id;
-        $model->productId = $product->id;
-        if (!$model->save()) {
-            throw new CException(sprintf(
-                'Failed to link product #%d to paytrail payment #%d.',
-                $product->id,
-                $this->id
-            ));
-        }
-        return $model;
-    }
-
     public function toObject()
     {
         $object = new Payment;

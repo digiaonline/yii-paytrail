@@ -12,5 +12,12 @@
     "require": {
         "nordsoftware/yii-paymentmanager": "0.1.*",
         "nordsoftware/paytrail-php": "0.1.*"
+    },
+    "autoload": {
+        "classmap": [
+            "components/",
+            "controllers/",
+            "models/"
+        ]
     }
 }
