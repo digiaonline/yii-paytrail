@@ -21,7 +21,8 @@ class PaytrailController extends PaymentController
     {
         return array(
             'accessControl',
-            'validateRequest + success, failure, notify, pending',
+            'validateSuccessRequest + success, notify',
+            'validateFailureRequest + failure',
         );
     }
 
@@ -30,36 +31,45 @@ class PaytrailController extends PaymentController
      * @throws CHttpException
      * @throws CException
      */
-    public function filterValidateRequest(CFilterChain $filterChain)
+    public function filterValidateSuccessRequest(CFilterChain $filterChain)
     {
-        if (!isset($_GET['ORDER_NUMBER']) || !isset($_GET['TIMESTAMP']) || !isset($_GET['PAID']) || !isset($_GET['METHOD'])) {
-            throw new CHttpException(400, 'Invalid request.');
-        }
-        if (!$this->validateAuthCode()) {
+        $gateway = $this->createGateway();
+        $data = implode('|', array($_GET['ORDER_NUMBER'], $_GET['TIMESTAMP'], $_GET['PAID'], $_GET['METHOD'], $gateway->apiSecret));
+        if (!$this->validateAuthCode($_GET['RETURN_AUTHCODE'], $data)) {
             throw new CException('Invalid authentication code.');
         }
         $filterChain->run();
     }
 
     /**
+     * @param CFilterChain $filterChain
+     * @throws CHttpException
+     * @throws CException
+     */
+    public function filterValidateFailureRequest(CFilterChain $filterChain)
+    {
+        $gateway = $this->createGateway();
+        $data = implode('&', array($_GET['ORDER_NUMBER'], $_GET['TIMESTAMP'], $gateway->apiSecret));
+        if (!$this->validateAuthCode($_GET['RETURN_AUTHCODE'], $data)) {
+            throw new CException('Invalid authentication code.');
+        }
+        $filterChain->run();
+    }
+
+    /**
+     * @return PaytrailGateway
+     */
+    protected function createGateway()
+    {
+        return $this->getPaymentManager()->createGateway('paytrail');
+    }
+
+    /**
      * @return bool
      */
-    protected function validateAuthCode()
+    protected function validateAuthCode($code, $data)
     {
-        $manager = $this->getPaymentManager();
-        /** @var PaytrailGateway $gateway */
-        $gateway = $manager->createGateway('paytrail');
-        $data = implode(
-            '|',
-            array(
-                $_GET['ORDER_NUMBER'],
-                $_GET['TIMESTAMP'],
-                $_GET['PAID'],
-                $_GET['METHOD'],
-                $gateway->apiSecret,
-            )
-        );
-        return $_GET['RETURN_AUTHCODE'] === strtoupper(md5($data));
+        return $code !== strtoupper(md5($data));
     }
 
     /**
@@ -73,102 +83,65 @@ class PaytrailController extends PaymentController
         );
     }
 
-    public function actionTest()
-    {
-        $transaction = PaymentTransaction::create(
-            array(
-                'gateway' => 'paytrail',
-                'orderIdentifier' => 1,
-                'description' => 'Test payment',
-                'price' => 100.00,
-                'currency' => 'EUR',
-                'vat' => 28.00,
-            )
-        );
-
-        $transaction->addShippingContact(
-            array(
-                'firstName' => 'Foo',
-                'lastName' => 'Bar',
-                'email' => 'foo@bar.com',
-                'phoneNumber' => '1234567890',
-                'mobileNumber' => '0400123123',
-                'companyName' => 'Test company',
-                'streetAddress' => 'Test street 1',
-                'postalCode' => '12345',
-                'postOffice' => 'Helsinki',
-                'countryCode' => 'FIN',
-            )
-        );
-
-        $transaction->addItem(
-            array(
-                'description' => 'Test product',
-                'code' => '01234',
-                'quantity' => 5,
-                'price' => 19.90,
-                'vat' => 23.00,
-                'discount' => 10.00,
-                'type' => 1,
-            )
-        );
-
-        $transaction->addItem(
-            array(
-                'description' => 'Another test product',
-                'code' => '43210',
-                'quantity' => 1,
-                'price' => 49.90,
-                'vat' => 23.00,
-                'discount' => 50.00,
-                'type' => 1,
-            )
-        );
-
-        Yii::app()->payment->startTransaction($transaction);
-    }
-
     /**
-     * @param int $transactionId
+     * Invoked by Paytrail after a successful payment.
+     * @param string $ORDER_NUMBER
+     * @param string $TIMESTAMP
+     * @param string $PAID
+     * @param string $METHOD
+     * @param string $RETURN_AUTHCODE
      */
-    public function actionSuccess($transactionId)
+    public function actionSuccess($ORDER_NUMBER, $TIMESTAMP, $PAID, $METHOD, $RETURN_AUTHCODE)
     {
         $manager = $this->getPaymentManager();
-        $transaction = $manager->loadTransaction($transactionId);
-        $manager->changeTransactionStatus(PaymentTransaction::STATUS_SUCCESSFUL, $transaction);
+        $transaction = $this->loadTransaction($ORDER_NUMBER);
+        $manager->changeTransactionStatus(PaymentTransaction::STATUS_SUCCEEDED, $transaction);
         $this->redirect($manager->successUrl);
     }
 
     /**
-     * @param int $transactionId
+     * Invoked by Paytrail after a failed payment.
+     * @param string $ORDER_NUMBER
+     * @param string $TIMESTAMP
+     * @param string $RETURN_AUTHCODE
      */
-    public function actionFailure($transactionId)
+    public function actionFailure($ORDER_NUMBER, $TIMESTAMP, $RETURN_AUTHCODE)
     {
         $manager = $this->getPaymentManager();
-        $transaction = $manager->loadTransaction($transactionId);
-        $manager->changeTransactionStatus(PaymentTransaction::STATUS_FAILED, $transaction);
+        $transaction = $this->loadTransaction($ORDER_NUMBER);
+        $manager->changeTransactionStatus(PaymentTransaction::STATUS_CANCELLED, $transaction);
         $this->redirect($manager->failureUrl);
     }
 
     /**
-     * @param int $transactionId
+     * Invoked by Paytrail when a payment has been confirmed.
+     * @param string $ORDER_NUMBER
+     * @param string $TIMESTAMP
+     * @param string $PAID
+     * @param string $METHOD
+     * @param string $RETURN_AUTHCODE
      */
-    public function actionNotify($transactionId)
+    public function actionNotify($ORDER_NUMBER, $TIMESTAMP, $PAID, $METHOD, $RETURN_AUTHCODE)
     {
         $manager = $this->getPaymentManager();
-        $transaction = $manager->loadTransaction($transactionId);
+        $transaction = $this->loadTransaction($ORDER_NUMBER);
         $manager->changeTransactionStatus(PaymentTransaction::STATUS_COMPLETED, $transaction);
         Yii::app()->end();
     }
 
     /**
-     * @param int $transactionId
+     * @param $orderNumber
+     * @return PaymentTransaction
+     * @throws CException
      */
-    public function actionPending($transactionId)
+    protected function loadTransaction($orderNumber)
     {
-        $manager = $this->getPaymentManager();
-        $transaction = $manager->loadTransaction($transactionId);
-        $manager->changeTransactionStatus(PaymentTransaction::STATUS_PENDING, $transaction);
-        Yii::app()->end();
+        $transaction = CActiveRecord::model($this->getPaymentManager()->transactionClass)->findByAttributes(
+            array('orderIdentifier' => $orderNumber)
+        );
+        if ($transaction === null) {
+            throw new CException(sprintf('Failed to load payment transaction with order identifier #%d.', $orderNumber));
+        }
+        return $transaction;
     }
 }
