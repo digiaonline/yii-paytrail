@@ -49,7 +49,7 @@ class PaytrailController extends PaymentController
     public function filterValidateFailureRequest(CFilterChain $filterChain)
     {
         $gateway = $this->createGateway();
-        $data = implode('&', array($_GET['ORDER_NUMBER'], $_GET['TIMESTAMP'], $gateway->apiSecret));
+        $data = implode('|', array($_GET['ORDER_NUMBER'], $_GET['TIMESTAMP'], $gateway->apiSecret));
         if (!$this->validateAuthCode($_GET['RETURN_AUTHCODE'], $data)) {
             throw new CException('Invalid authentication code.');
         }
@@ -69,7 +69,7 @@ class PaytrailController extends PaymentController
      */
     protected function validateAuthCode($code, $data)
     {
-        return $code !== strtoupper(md5($data));
+        return $code === strtoupper(md5($data));
     }
 
     /**
@@ -109,7 +109,7 @@ class PaytrailController extends PaymentController
     {
         $manager = $this->getPaymentManager();
         $transaction = $this->loadTransaction($ORDER_NUMBER);
-        $manager->changeTransactionStatus(PaymentTransaction::STATUS_CANCELLED, $transaction);
+        $manager->changeTransactionStatus(PaymentTransaction::STATUS_FAILED, $transaction);
         $this->redirect($manager->failureUrl);
     }
 
