@@ -67,6 +67,16 @@ class PaytrailGateway extends PaymentGateway
     protected $_client;
 
     /**
+     * @var PaytrailPayment
+     */
+    protected $_payment;
+
+    /**
+     * @var PaytrailResult
+     */
+    protected $_result;
+
+    /**
      * Initializes this gateway.
      */
     public function init()
@@ -77,9 +87,8 @@ class PaytrailGateway extends PaymentGateway
 
     /**
      * @param PaymentTransaction $transaction
-     * @throws Exception
      */
-    public function handleTransaction($transaction)
+    public function prepareTransaction(PaymentTransaction $transaction)
     {
         $attributes = array();
         foreach (array('success', 'failure', 'notification', 'pending') as $attribute) {
@@ -136,23 +145,37 @@ class PaytrailGateway extends PaymentGateway
             );
         }
 
-        try {
-            $this->onBeforeProcessTransaction($this->createEvent($transaction));
-            $response = $this->_client->processPayment($payment->toObject());
-            $result = PaytrailResult::create(
-                array(
-                    'paymentId' => $payment->id,
-                    'orderNumber' => $response->getOrderNumber(),
-                    'token' => $response->getToken(),
-                    'url' => $response->getUrl(),
-                )
-            );
-            $this->onAfterProcessTransaction($this->createEvent($transaction));
-            Yii::app()->controller->redirect($result->url);
-        } catch (Exception $e) {
-            $this->onTransactionFailed($this->createEvent($transaction));
-            throw $e;
+        $this->_payment = $payment;
+    }
+
+    /**
+     * @param PaymentTransaction $transaction
+     */
+    public function processTransaction(PaymentTransaction $transaction)
+    {
+        if ($this->_payment === null) {
+            throw new CException(sprintf('Cannot process transaction #%d without payment.', $transaction->id));
         }
+        $response = $this->_client->processPayment($this->_payment->toObject());
+        $this->_result = PaytrailResult::create(
+            array(
+                'paymentId' => $this->_payment->id,
+                'orderNumber' => $response->getOrderNumber(),
+                'token' => $response->getToken(),
+                'url' => $response->getUrl(),
+            )
+        );
+    }
+
+    /**
+     * @param PaymentTransaction $transaction
+     */
+    public function resolveTransaction(PaymentTransaction $transaction)
+    {
+        if ($this->_result === null) {
+            throw new CException(sprintf('Cannot resolve transaction #%d without payment.', $transaction->id));
+        }
+        Yii::app()->controller->redirect($this->_result->url);
     }
 
     /**
