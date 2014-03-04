@@ -20,7 +20,6 @@ class PaytrailController extends PaymentController
     public function filters()
     {
         return array(
-            'accessControl',
             'validateSuccessRequest + success, notify',
             'validateFailureRequest + failure',
         );
@@ -57,33 +56,6 @@ class PaytrailController extends PaymentController
     }
 
     /**
-     * @return PaytrailGateway
-     */
-    protected function createGateway()
-    {
-        return $this->getPaymentManager()->createGateway('paytrail');
-    }
-
-    /**
-     * @return bool
-     */
-    protected function validateAuthCode($code, $data)
-    {
-        return $code === strtoupper(md5($data));
-    }
-
-    /**
-     * @return array access control rules.
-     */
-    public function accessRules()
-    {
-        return array(
-            array('allow', 'users' => array('@')),
-            array('deny'),
-        );
-    }
-
-    /**
      * Invoked by Paytrail after a successful payment.
      * @param string $ORDER_NUMBER
      * @param string $TIMESTAMP
@@ -96,7 +68,8 @@ class PaytrailController extends PaymentController
         $manager = $this->getPaymentManager();
         $transaction = $this->loadTransaction($ORDER_NUMBER);
         $manager->changeTransactionStatus(PaymentTransaction::STATUS_SUCCEEDED, $transaction);
-        $this->redirect($manager->successUrl);
+        $context = $manager->resolveContext($transaction->context);
+        $this->redirect($context->successUrl);
     }
 
     /**
@@ -110,7 +83,8 @@ class PaytrailController extends PaymentController
         $manager = $this->getPaymentManager();
         $transaction = $this->loadTransaction($ORDER_NUMBER);
         $manager->changeTransactionStatus(PaymentTransaction::STATUS_FAILED, $transaction);
-        $this->redirect($manager->failureUrl);
+        $context = $manager->resolveContext($transaction->context);
+        $this->redirect($context->failureUrl);
     }
 
     /**
@@ -143,5 +117,23 @@ class PaytrailController extends PaymentController
             throw new CException(sprintf('Failed to load payment transaction with order identifier #%d.', $orderNumber));
         }
         return $transaction;
+    }
+
+    /**
+     * @return PaytrailGateway
+     */
+    protected function createGateway()
+    {
+        return $this->getPaymentManager()->createGateway('paytrail');
+    }
+
+    /**
+     * @param string $code
+     * @param string $data
+     * @return bool
+     */
+    protected function validateAuthCode($code, $data)
+    {
+        return $code === strtoupper(md5($data));
     }
 }
