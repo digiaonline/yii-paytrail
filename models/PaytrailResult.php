@@ -52,7 +52,7 @@ class PaytrailResult extends PaytrailActiveRecord
     public function rules()
     {
         return array(
-            array('paymentId, token, url', 'required'),
+            array('paymentId, url', 'required'),
             array('status', 'numerical', 'integerOnly' => true),
             array('paymentId', 'length', 'max' => 10),
             array('orderNumber, token', 'length', 'max' => 64),

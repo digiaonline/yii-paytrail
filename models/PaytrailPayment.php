@@ -125,6 +125,29 @@ class PaytrailPayment extends PaytrailActiveRecord
     }
 
     /**
+     * Calculates the payment total price.
+     * @param bool $inclVat if VAT is to be included (defaults to true).
+     * @return int|string the calculated price.
+     */
+    public function getTotal($inclVat = true)
+    {
+        $total = 0;
+        $calcVat = $inclVat && !$this->includeVat;
+        foreach ($this->products as $product) {
+            $price = $product->price;
+            if ($product->discount > 0) {
+                $price = bcsub($price, $product->discount, 2);
+            }
+            if ($calcVat && $product->vat > 0) {
+                $vat = bcadd(bcdiv($product->vat, 100, 2), 1, 2);
+                $price = bcmul($price, $vat, 2);
+            }
+            $total = bcadd($total, $price, 2);
+        }
+        return $total;
+    }
+
+    /**
      * @param array $attributes
      * @return PaytrailPayment
      */

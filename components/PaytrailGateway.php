@@ -55,6 +55,13 @@ class PaytrailGateway extends PaymentGateway
     /**
      * @var array
      */
+    public $paymentMinLimits = array(
+        'EUR' => 0.65,
+    );
+
+    /**
+     * @var array
+     */
     protected static $supportedLocales = array(
         Payment::LOCALE_ENUS,
         Payment::LOCALE_FIFI,
@@ -150,13 +157,32 @@ class PaytrailGateway extends PaymentGateway
 
     /**
      * @param PaymentTransaction $transaction
+     * @throws CException
      */
     public function processTransaction(PaymentTransaction $transaction)
     {
         if ($this->_payment === null) {
             throw new CException(sprintf('Cannot process transaction #%d without payment.', $transaction->id));
         }
-        $response = $this->_client->processPayment($this->_payment->toObject());
+
+        if ($this->needPayment()) {
+            $response = $this->_client->processPayment($this->_payment->toObject());
+        } else {
+            $params = array(
+                'ORDER_NUMBER' => $this->_payment->orderNumber,
+                'TIMESTAMP' => time(),
+                'PAID' => true,
+                'METHOD' => 'none',
+            );
+            $response = new PaytrailResponse();
+            $response->configure(
+                array(
+                    'orderNumber' => $this->_payment->orderNumber,
+                    'url' => $this->createUrl('successUrl', $params)
+                )
+            );
+        }
+
         $this->_result = PaytrailResult::create(
             array(
                 'paymentId' => $this->_payment->id,
@@ -481,5 +507,37 @@ class PaytrailGateway extends PaymentGateway
             $locale = $parts[0] . '_' . strtoupper($parts[1]);
         }
         return in_array($locale, self::$supportedLocales) ? $locale : $this->defaultLocale;
+    }
+
+    /**
+     * @return bool
+     */
+    protected function needPayment()
+    {
+        if (isset($this->paymentMinLimits[$this->_payment->currency])) {
+            return ($this->_payment->getTotal() >= $this->paymentMinLimits[$this->_payment->currency]);
+        }
+        return true;
+    }
+
+    /**
+     * @param string $type
+     * @param array $params
+     * @return string
+     * @throws CException
+     */
+    protected function createUrl($type, array $params)
+    {
+        if ($this->_payment->urlset === null) {
+            throw new CException(sprintf('Cannot create url. No url-set found for payment #%d.', $this->_payment->id));
+        }
+        if (!isset($this->_payment->urlset->{$type})) {
+            throw new CException(sprintf('Cannot create url. No "%s" found in url-set for payment #%d.', $type, $this->_payment->id));
+        }
+        $baseUrl = $this->_payment->urlset->{$type};
+        $data = array_values($params);
+        $data[] = $this->apiSecret;
+        $params['RETURN_AUTHCODE'] = strtoupper(md5(implode('|', $data)));
+        return $baseUrl . '?' . http_build_query($params);
     }
 }
