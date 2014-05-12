@@ -134,7 +134,7 @@ class PaytrailPayment extends PaytrailActiveRecord
         $total = 0;
         $calcVat = $inclVat && !$this->includeVat;
         foreach ($this->products as $product) {
-            $price = $product->price;
+            $price = bcmul($product->price, (int)$product->quantity, 2);
             if ($product->discount > 0) {
                 $price = bcsub($price, $product->discount, 2);
             }
