@@ -15,6 +15,16 @@ class PaytrailController extends PaymentController
     public $managerId = 'payment';
 
     /**
+     * @var PaymentTransaction
+     */
+    private $_transaction;
+
+    /**
+     * @var PaytrailGateway
+     */
+    private $_gateway;
+
+    /**
      * @return array
      */
     public function filters()
@@ -26,30 +36,44 @@ class PaytrailController extends PaymentController
     }
 
     /**
-     * @param CFilterChain $filterChain
-     * @throws CHttpException
-     * @throws CException
+     * Insures that successful payment requests have a valid authentication code in the GET params.
+     * @param CFilterChain $filterChain the filter chain.
+     * @throws CException if the authentication code does not match the passed data.
      */
     public function filterValidateSuccessRequest(CFilterChain $filterChain)
     {
-        $gateway = $this->createGateway();
-        $data = implode('|', array($_GET['ORDER_NUMBER'], $_GET['TIMESTAMP'], $_GET['PAID'], $_GET['METHOD'], $gateway->apiSecret));
-        if (!$this->validateAuthCode($_GET['RETURN_AUTHCODE'], $data)) {
+        $request = Yii::app()->getRequest();
+        $ORDER_NUMBER = $request->getQuery('ORDER_NUMBER');
+        $TIMESTAMP = $request->getQuery('TIMESTAMP');
+        $PAID = $request->getQuery('PAID');
+        $METHOD = $request->getQuery('METHOD');
+        $RETURN_AUTHCODE = $request->getQuery('RETURN_AUTHCODE');
+
+        $transaction = $this->loadTransaction($ORDER_NUMBER);
+        $gateway = $this->createGateway($transaction->gateway);
+        $data = implode('|', array($ORDER_NUMBER, $TIMESTAMP, $PAID, $METHOD, $gateway->apiSecret));
+        if (!$this->validateAuthCode($RETURN_AUTHCODE, $data)) {
             throw new CException('Invalid authentication code.');
         }
         $filterChain->run();
     }
 
     /**
-     * @param CFilterChain $filterChain
-     * @throws CHttpException
-     * @throws CException
+     * Insures that failed payment requests have a valid authentication code in the GET params.
+     * @param CFilterChain $filterChain the filter chain.
+     * @throws CException if the authentication code does not match the passed data.
      */
     public function filterValidateFailureRequest(CFilterChain $filterChain)
     {
-        $gateway = $this->createGateway();
-        $data = implode('|', array($_GET['ORDER_NUMBER'], $_GET['TIMESTAMP'], $gateway->apiSecret));
-        if (!$this->validateAuthCode($_GET['RETURN_AUTHCODE'], $data)) {
+        $request = Yii::app()->getRequest();
+        $ORDER_NUMBER = $request->getQuery('ORDER_NUMBER');
+        $TIMESTAMP = $request->getQuery('TIMESTAMP');
+        $RETURN_AUTHCODE = $request->getQuery('RETURN_AUTHCODE');
+
+        $transaction = $this->loadTransaction($ORDER_NUMBER);
+        $gateway = $this->createGateway($transaction->gateway);
+        $data = implode('|', array($ORDER_NUMBER, $TIMESTAMP, $gateway->apiSecret));
+        if (!$this->validateAuthCode($RETURN_AUTHCODE, $data)) {
             throw new CException('Invalid authentication code.');
         }
         $filterChain->run();
@@ -104,33 +128,43 @@ class PaytrailController extends PaymentController
     }
 
     /**
-     * @param $orderNumber
-     * @return PaymentTransaction
-     * @throws CException
+     * Loads the order transaction instance based on order number.
+     * @param int|string $orderNumber the order number.
+     * @return PaymentTransaction the transaction.
+     * @throws CException if the transaction cannot be found based on the order number.
      */
     protected function loadTransaction($orderNumber)
     {
+        if ($this->_transaction !== null) {
+            return $this->_transaction;
+        }
         $transaction = CActiveRecord::model($this->getPaymentManager()->transactionClass)->findByAttributes(
             array('orderIdentifier' => $orderNumber)
         );
         if ($transaction === null) {
             throw new CException(sprintf('Failed to load payment transaction with order identifier #%d.', $orderNumber));
         }
-        return $transaction;
+        return $this->_transaction = $transaction;
     }
 
     /**
-     * @return PaytrailGateway
+     * Creates a payment gateway instance.
+     * @param string $name the name of the gateway to create.
+     * @return PaytrailGateway the gateway.
      */
-    protected function createGateway()
+    protected function createGateway($name)
     {
-        return $this->getPaymentManager()->createGateway('paytrail');
+        if ($this->_gateway !== null) {
+            return $this->_gateway;
+        }
+        return $this->_gateway = $this->getPaymentManager()->createGateway($name);
     }
 
     /**
-     * @param string $code
-     * @param string $data
-     * @return bool
+     * Validates that the authentication code passed by Paytrail is valid.
+     * @param string $code the code passed from Paytrail.
+     * @param string $data the data that the code should consists of.
+     * @return bool if the codes match.
      */
     protected function validateAuthCode($code, $data)
     {
