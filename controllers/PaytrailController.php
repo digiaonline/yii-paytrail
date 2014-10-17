@@ -125,7 +125,7 @@ class PaytrailController extends PaymentController
         $transaction = $this->loadTransaction($ORDER_NUMBER);
         $manager->changeTransactionStatus(PaymentTransaction::STATUS_COMPLETED, $transaction);
         $context = $manager->resolveContext($transaction->context);
-        if (isset($context->notifyCallback)) {
+        if (isset($context->notifyCallback) && is_callable($context->notifyCallback)) {
             call_user_func($context->notifyCallback, $transaction);
         }
         Yii::app()->end();
